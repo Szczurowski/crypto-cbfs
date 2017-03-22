@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using CallbackFS;
 
 namespace Crypto.Runner
@@ -34,10 +36,21 @@ namespace Crypto.Runner
 
                 cbfs = new CallbackFileSystem
                 {
+                    OnGetVolumeLabel = CbFsGetVolumeLabel,
                     OnCreateFile = CbFsCreateFile,
                     OnMount = x => { }
                 };
                 cbfs.CreateStorage();
+
+                cbfs.AddMountingPoint("X:", CallbackFileSystem.CBFS_SYMLINK_MOUNT_MANAGER, null);
+
+                // Use this method to mount new media to the created storage. 
+                // Call this method after calling CreateStorage. 
+                // For non-PnP storages you can add mounting points before or after calling MountMedia. 
+                // For PnP storages you need to call MountMedia before adding any mounting points.
+                Console.WriteLine("Mounting...");
+                cbfs.MountMedia(10); // chyba nie potrzebne
+                Console.WriteLine(UpdateMountingPoints(cbfs));
 
                 // mount
                 var dirinfo = new DirectoryInfo(mRootPath);
@@ -46,7 +59,10 @@ namespace Crypto.Runner
                     dirinfo.Create();
                 }
 
-                cbfs.MountMedia(0);
+                
+
+                Console.WriteLine("Press any key for Disposal...");
+                Console.ReadLine();
             }
             catch (Exception e)
             {
@@ -56,7 +72,8 @@ namespace Crypto.Runner
             {
                 if (null != cbfs)
                 {
-                    cbfs.UnmountMedia(true);
+                    // rzuca wyjątek - kolejność do ustalenia
+                    // cbfs.UnmountMedia(true); - nie potrzebne
                     while (cbfs.GetMountingPointCount() != 0)
                     {
                         cbfs.DeleteMountingPoint(0);
@@ -123,6 +140,28 @@ namespace Crypto.Runner
                 return "Driver not installed";
             }
         }
+        private static string UpdateMountingPoints(CallbackFileSystem cbfs)
+        {
+            int Index;
+            string MountingPoint;
+            uint Flags;
+            LUID AuthenticationId;
+
+            var lstPoints = new List<string>();
+
+            for (Index = 0; Index < cbfs.MountingPointCount; Index++)
+            {
+                cbfs.GetMountingPoint(Index, out MountingPoint, out Flags, out AuthenticationId);
+                lstPoints.Add(MountingPoint);
+
+            }
+            if (lstPoints.Count > 0)
+            {
+                //lstPoints.SetSelected(0, true);
+            }
+
+            return string.Join(", ", lstPoints);
+        }
 
         private static void CbFsCreateFile(object sender,
             string FileName,
@@ -133,6 +172,11 @@ namespace Crypto.Runner
             CbFsHandleInfo HandleInfo
             )
         {
+        }
+
+        private static void CbFsGetVolumeLabel(object sender, ref string VolumeLabel)
+        {
+            VolumeLabel = "CbFs Test";
         }
     }
 }
