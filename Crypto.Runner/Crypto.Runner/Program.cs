@@ -11,6 +11,8 @@ namespace Crypto.Runner
         private const string driverPath = @"..\..\..\..\..\Drivers\cbfs.cab";
         private const string mRootPath = "Location";
         private const string mGuid = "713CC6CE-B3E2-4fd9-838D-E28F558F6866";
+        private const string mRegKey7 = "2A65D30F47C829E1FF5CB13E4300B5A23798B17A3104CB490D3ADF3CFB8DD67236152C722D39FC244BA7B3832BC18E7696B68894075485F0259277087D2A4F182D7E83784D5E631C51FA9FBC319A3F98ADFE03CC81AACFBC319A3F9CF17E83F180";
+        private const string mRegKey6 = "3C9A3DCC0A8355554D7A1F7CD15E6320B5CE84CF545342A670A512F7FE76D71DAB4625E1944A157766442EC01E4A2F691B7511F7BA2F6017B44916476479C6BF3CB5A23FBC3522BB98A976FBD8E9B6FF7CF5E24BE879C69BB889569B988DBA87BE";
 
         static void Main(string[] args)
         {
@@ -18,11 +20,11 @@ namespace Crypto.Runner
             UInt32 Reboot = 0;
             try
             {
-                CallbackFileSystem.SetRegistrationKey("2A65D30F47C829E1FF5CB13E4300B5A23798B17A3104CB490D3ADF3CFB8DD67236152C722D39FC244BA7B3832BC18E7696B68894075485F0259277087D2A4F182D7E83784D5E631C51FA9FBC319A3F98ADFE03CC81AACFBC319A3F9CF17E83F180");
+                CallbackFileSystem.SetRegistrationKey(mRegKey6);
 
                 CallbackFileSystem.Install(driverPath, mGuid, Environment.SystemDirectory,                                                true,
-                                                //CallbackFileSystem.CBFS_MODULE_NET_REDIRECTOR_DLL |
-                                                    CallbackFileSystem.CBFS_MODULE_MOUNT_NOTIFIER_DLL,
+                                                CallbackFileSystem.CBFS_MODULE_NET_REDIRECTOR_DLL /*|
+                                                    CallbackFileSystem.CBFS_MODULE_MOUNT_NOTIFIER_DLL*/,
                                                 ref Reboot);
 
                 var status = UpdateDriverStatus();
@@ -32,8 +34,8 @@ namespace Crypto.Runner
 
                 cbfs = new CallbackFileSystem
                 {
-                    OnCreateFile = new CbFsCreateFileEvent(CbFsCreateFile),
-                    OnMount = new CbFsMountEvent(x => { })
+                    OnCreateFile = CbFsCreateFile,
+                    OnMount = x => { }
                 };
                 cbfs.CreateStorage();
 
