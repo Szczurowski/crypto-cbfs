@@ -11,7 +11,7 @@ namespace Crypto.Runner
     class Program
     {
         private const string driverPath = @"..\..\..\..\..\Drivers\cbfs.cab";
-        private const string mRootPath = "Location";
+        private const string mRootPath = @"C:\1";
         private const string mGuid = "713CC6CE-B3E2-4fd9-838D-E28F558F6866";
         private const string mRegKey7 = "2A65D30F47C829E1FF5CB13E4300B5A23798B17A3104CB490D3ADF3CFB8DD67236152C722D39FC244BA7B3832BC18E7696B68894075485F0259277087D2A4F182D7E83784D5E631C51FA9FBC319A3F98ADFE03CC81AACFBC319A3F9CF17E83F180";
         private const string mRegKey6 = "3C9A3DCC0A8355554D7A1F7CD15E6320B5CE84CF545342A670A512F7FE76D71DAB4625E1944A157766442EC01E4A2F691B7511F7BA2F6017B44916476479C6BF3CB5A23FBC3522BB98A976FBD8E9B6FF7CF5E24BE879C69BB889569B988DBA87BE";
@@ -22,44 +22,54 @@ namespace Crypto.Runner
             UInt32 Reboot = 0;
             try
             {
-                CallbackFileSystem.SetRegistrationKey(mRegKey6);
+                //cbfs = new CallbackFileSystem
+                //{
+                //    OnGetVolumeLabel = CbFsGetVolumeLabel,
+                //    OnCreateFile = CbFsCreateFile,
+                //    OnMount = x => { }
+                //};
+                cbfs = GetCallbackFileSystem(mRootPath);
 
-                CallbackFileSystem.Install(driverPath, mGuid, Environment.SystemDirectory,                                                true,
-                                                CallbackFileSystem.CBFS_MODULE_NET_REDIRECTOR_DLL /*|
-                                                    CallbackFileSystem.CBFS_MODULE_MOUNT_NOTIFIER_DLL*/,
-                                                ref Reboot);
 
                 var status = UpdateDriverStatus();
-                Console.WriteLine(status);
+                Console.WriteLine(status.Item2);
 
-                CallbackFileSystem.Initialize(mGuid);
-
-                cbfs = new CallbackFileSystem
+                if (!status.Item1)
                 {
-                    OnGetVolumeLabel = CbFsGetVolumeLabel,
-                    OnCreateFile = CbFsCreateFile,
-                    OnMount = x => { }
-                };
+                    Console.WriteLine("Installing");
+                    CallbackFileSystem.Install(driverPath, mGuid, Environment.SystemDirectory, true,
+                                                   CallbackFileSystem.CBFS_MODULE_NET_REDIRECTOR_DLL /*|
+                                                    CallbackFileSystem.CBFS_MODULE_MOUNT_NOTIFIER_DLL*/,
+                                                   ref Reboot);
+                }
+
+
+                // CREATE STORAGE
+                CallbackFileSystem.SetRegistrationKey(mRegKey6);
+                CallbackFileSystem.Initialize(mGuid);
                 cbfs.CreateStorage();
 
-                cbfs.AddMountingPoint("X:", CallbackFileSystem.CBFS_SYMLINK_MOUNT_MANAGER, null);
-
+                
+                // MOUNT
+                //
                 // Use this method to mount new media to the created storage. 
                 // Call this method after calling CreateStorage. 
                 // For non-PnP storages you can add mounting points before or after calling MountMedia. 
                 // For PnP storages you need to call MountMedia before adding any mounting points.
                 Console.WriteLine("Mounting...");
-                cbfs.MountMedia(10); // chyba nie potrzebne
+                cbfs.MountMedia(0); // chyba nie potrzebne
                 Console.WriteLine(UpdateMountingPoints(cbfs));
 
-                // mount
+
+                // ADD mounting point
                 var dirinfo = new DirectoryInfo(mRootPath);
                 if (!dirinfo.Exists)
                 {
                     dirinfo.Create();
                 }
+                cbfs.AddMountingPoint("X:", CallbackFileSystem.CBFS_SYMLINK_MOUNT_MANAGER, null);
 
-                
+
 
                 Console.WriteLine("Press any key for Disposal...");
                 Console.ReadLine();
@@ -81,7 +91,7 @@ namespace Crypto.Runner
                     cbfs.DeleteStorage(true);
                 }
 
-                CallbackFileSystem.Uninstall(driverPath, mGuid, Environment.SystemDirectory, ref Reboot);
+                // CallbackFileSystem.Uninstall(driverPath, mGuid, Environment.SystemDirectory, ref Reboot);
 
                 var status = UpdateDriverStatus();
                 Console.WriteLine(status);
@@ -91,7 +101,12 @@ namespace Crypto.Runner
             Console.ReadLine();
         }
 
-        private static string UpdateDriverStatus()
+        private static CallbackFileSystem GetCallbackFileSystem(string rootPath)
+        {
+            return new MyFileSystem(mRootPath).CallbackFileSystem;
+        }
+
+        private static Tuple<bool, string> UpdateDriverStatus()
         {
             bool Installed = false;
 
@@ -101,6 +116,7 @@ namespace Crypto.Runner
 
             CallbackFileSystem.GetModuleStatus(mGuid, CallbackFileSystem.CBFS_MODULE_DRIVER, ref Installed, ref VersionHigh, ref VersionLow, ref status);
 
+            string message;
             if (Installed)
             {
                 string strStat;
@@ -133,12 +149,14 @@ namespace Crypto.Runner
                         break;
                 }
 
-                return string.Format("Driver (ver {0}.{1}.{2}.{3}) installed, service {4}", VersionHigh >> 16, VersionHigh & 0xFFFF, VersionLow >> 16, VersionLow & 0xFFFF, strStat);
+                message = string.Format("Driver (ver {0}.{1}.{2}.{3}) installed, service {4}", VersionHigh >> 16, VersionHigh & 0xFFFF, VersionLow >> 16, VersionLow & 0xFFFF, strStat);
             }
             else
             {
-                return "Driver not installed";
+                message = "Driver not installed";
             }
+
+            return Tuple.Create(Installed, message);
         }
         private static string UpdateMountingPoints(CallbackFileSystem cbfs)
         {
